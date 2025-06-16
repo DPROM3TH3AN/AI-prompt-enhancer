@@ -2,6 +2,7 @@
 import streamlit as st
 import requests
 import json
+import os
 
 # --- Page Configuration ---
 st.set_page_config(
@@ -10,8 +11,11 @@ st.set_page_config(
     layout="wide" # Using wide layout for more space
 )
 
+
 # --- Backend Configuration ---
-BACKEND_URL = "http://0.0.0.0:8000/structure-prompt" # Updated endpoint
+BACKEND_URL = os.getenv("BACKEND_URL", "http://0.0.0.0:8000/structure-prompt")
+
+
 
 # --- UI Components ---
 st.title("✨ AI Prompt Enhancer")
