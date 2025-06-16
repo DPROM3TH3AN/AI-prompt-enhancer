@@ -2,5 +2,4 @@ fastapi
 uvicorn[standard]
 pydantic
 python-dotenv
-supabase-py
 google-generativeai
