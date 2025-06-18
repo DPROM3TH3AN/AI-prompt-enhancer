@@ -68,7 +68,7 @@ async def structure_prompt(request: UserPromptRequest):
     
     try:
         # Initialize Gemini model
-        model = genai.GenerativeModel('gemini-2.0-flash')
+        model = genai.GenerativeModel('gemini-pro')
         
         # Construct prompt template
         instruction = (
