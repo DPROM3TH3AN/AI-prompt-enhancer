@@ -1,21 +1,34 @@
-
 import streamlit as st
 import requests
 import json
 import os
 
+# --- Configuration ---
+BACKEND_URL = os.getenv("BACKEND_URL", "http://0.0.0.0:8000/structure-prompt")
+DEFAULT_HEADERS = {
+    "Content-Type": "application/json",
+    "Accept": "application/json"
+}
+
 # --- Page Configuration ---
 st.set_page_config(
     page_title="AI Prompt Enhancer",
     page_icon="✨",
-    layout="wide" # Using wide layout for more space
+    layout="wide"
 )
 
+# --- Health Check Function ---
+def check_backend_health():
+    try:
+        response = requests.head(BACKEND_URL, headers=DEFAULT_HEADERS, timeout=5)
+        return response.status_code in (200, 405)  # Both are acceptable
+    except requests.exceptions.RequestException:
+        return False
 
-# --- Backend Configuration ---
-BACKEND_URL = os.getenv("BACKEND_URL", "http://0.0.0.0:8000/structure-prompt")
-
-
+# --- Backend Health Check ---
+if not check_backend_health():
+    st.error(f"⚠️ Backend service is not accessible at {BACKEND_URL}. Please try again later.")
+    st.stop()
 
 # --- UI Components ---
 st.title("✨ AI Prompt Enhancer")
@@ -34,7 +47,6 @@ st.sidebar.info(
     "5. The enhanced prompt is displayed back to you."
 )
 
-
 user_prompt = st.text_area("Enter your initial prompt here:", height=100, key="user_prompt_input")
 
 if st.button("Enhance My Prompt", type="primary"):
@@ -42,7 +54,7 @@ if st.button("Enhance My Prompt", type="primary"):
         with st.spinner("🧠 Let me think... Enhancing your prompt..."):
             try:
                 payload = {"prompt": user_prompt}
-                response = requests.post(BACKEND_URL, json=payload)
+                response = requests.post(BACKEND_URL, json=payload, headers=DEFAULT_HEADERS)
 
                 if response.status_code == 200:
                     result = response.json()
@@ -60,7 +72,6 @@ if st.button("Enhance My Prompt", type="primary"):
                         if result.get("structured_prompt", "").startswith("Error:"):
                             st.warning("There was an issue generating the enhanced prompt. The AI might have had trouble or an error occurred.")
 
-
                 else:
                     try:
                         error_details = response.json().get("detail", "Unknown error from backend.")
@@ -69,7 +80,7 @@ if st.button("Enhance My Prompt", type="primary"):
                     st.error(f"Error from backend (Status {response.status_code}): {error_details}")
 
             except requests.exceptions.ConnectionError:
-                st.error("Connection Error: Could not connect to the backend. Is it running at http://127.0.0.1:8000 ?")
+                st.error(f"Connection Error: Could not connect to the backend at {BACKEND_URL}")
             except Exception as e:
                 st.error(f"An unexpected error occurred: {str(e)}")
     else:
