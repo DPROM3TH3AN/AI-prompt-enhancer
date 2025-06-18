@@ -1,90 +1,101 @@
 import streamlit as st
 import requests
-import json
 import os
 
 # --- Configuration ---
-BACKEND_URL = os.getenv("BACKEND_URL", "http://0.0.0.0:8000/structure-prompt")
-DEFAULT_HEADERS = {
+BASE_URL = os.getenv("BACKEND_URL", "http://0.0.0.0:8000").rstrip('/')
+API_ENDPOINT = f"{BASE_URL}/structure-prompt"
+HEADERS = {
     "Content-Type": "application/json",
     "Accept": "application/json"
 }
 
-# --- Page Configuration ---
+# --- Health Check Function ---
+def check_backend_health():
+    """Check if backend is accessible"""
+    try:
+        response = requests.get(f"{BASE_URL}/", headers=HEADERS, timeout=5)
+        return response.status_code == 200
+    except requests.exceptions.RequestException:
+        return False
+
+# --- Page Setup ---
 st.set_page_config(
     page_title="AI Prompt Enhancer",
     page_icon="✨",
     layout="wide"
 )
 
-# --- Health Check Function ---
-def check_backend_health():
-    try:
-        response = requests.head(BACKEND_URL, headers=DEFAULT_HEADERS, timeout=5)
-        return response.status_code in (200, 405)  # Both are acceptable
-    except requests.exceptions.RequestException:
-        return False
-
 # --- Backend Health Check ---
 if not check_backend_health():
-    st.error(f"⚠️ Backend service is not accessible at {BACKEND_URL}. Please try again later.")
+    st.error(f"⚠️ Backend service is not accessible. Please try again later.")
     st.stop()
 
 # --- UI Components ---
 st.title("✨ AI Prompt Enhancer")
 st.markdown(
     "Enter your initial prompt, and our AI agent will help you refine it "
-    "into a more structured and effective version using Google Gemini. "
-    "All interactions are logged in Supabase."
+    "into a more structured and effective version using Google Gemini."
 )
 
-st.sidebar.header("How it Works")
-st.sidebar.info(
-    "1. You enter a basic idea or question.\n"
-    "2. We preprocess it and send it to our backend.\n"
-    "3. The backend securely logs your prompt.\n"
-    "4. Google Gemini is then used to transform your input into a more detailed and structured prompt.\n"
-    "5. The enhanced prompt is displayed back to you."
-)
+with st.sidebar:
+    st.header("How it Works")
+    st.info(
+        "1. Enter your basic prompt or question\n"
+        "2. Our AI processes your input\n"
+        "3. Get back an enhanced, structured version\n"
+        "4. Use the improved prompt with any AI system"
+    )
 
-user_prompt = st.text_area("Enter your initial prompt here:", height=100, key="user_prompt_input")
+# --- Main Interface ---
+user_prompt = st.text_area(
+    "Enter your initial prompt:",
+    height=100,
+    key="user_prompt"
+)
 
 if st.button("Enhance My Prompt", type="primary"):
-    if user_prompt:
-        with st.spinner("🧠 Let me think... Enhancing your prompt..."):
-            try:
-                payload = {"prompt": user_prompt}
-                response = requests.post(BACKEND_URL, json=payload, headers=DEFAULT_HEADERS)
-
-                if response.status_code == 200:
-                    result = response.json()
-                    st.success("✅ Prompt Enhanced!")
-
-                    col1, col2 = st.columns(2)
-
-                    with col1:
-                        st.subheader("Your Original Prompt:")
-                        st.text_area("", value=result.get("original_prompt"), height=150, disabled=True, key="orig_prompt_display")
-
-                    with col2:
-                        st.subheader("AI Enhanced Prompt:")
-                        st.text_area("", value=result.get("structured_prompt"), height=150, key="structured_prompt_display")
-                        if result.get("structured_prompt", "").startswith("Error:"):
-                            st.warning("There was an issue generating the enhanced prompt. The AI might have had trouble or an error occurred.")
-
-                else:
-                    try:
-                        error_details = response.json().get("detail", "Unknown error from backend.")
-                    except json.JSONDecodeError:
-                        error_details = response.text
-                    st.error(f"Error from backend (Status {response.status_code}): {error_details}")
-
-            except requests.exceptions.ConnectionError:
-                st.error(f"Connection Error: Could not connect to the backend at {BACKEND_URL}")
-            except Exception as e:
-                st.error(f"An unexpected error occurred: {str(e)}")
-    else:
+    if not user_prompt:
         st.warning("Please enter a prompt to enhance.")
+        st.stop()
+        
+    with st.spinner("🧠 Enhancing your prompt..."):
+        try:
+            response = requests.post(
+                API_ENDPOINT,
+                headers=HEADERS,
+                json={"prompt": user_prompt}
+            )
+            
+            if response.status_code == 200:
+                result = response.json()
+                st.success("✅ Prompt Enhanced!")
+                
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.subheader("Original Prompt")
+                    st.text_area(
+                        "",
+                        value=result["original_prompt"],
+                        height=150,
+                        disabled=True
+                    )
+                
+                with col2:
+                    st.subheader("Enhanced Prompt")
+                    st.text_area(
+                        "",
+                        value=result["structured_prompt"],
+                        height=150,
+                        key="enhanced"
+                    )
+            else:
+                st.error(f"Error: {response.json().get('detail', 'Unknown error')}")
+                
+        except requests.exceptions.ConnectionError:
+            st.error("Connection failed. Please check if the backend service is running.")
+        except Exception as e:
+            st.error(f"An error occurred: {str(e)}")
 
 st.markdown("---")
-st.caption("Powered by Streamlit, FastAPI, Supabase, and Google Gemini.")
+st.caption("Powered by Streamlit + FastAPI + Google Gemini")
